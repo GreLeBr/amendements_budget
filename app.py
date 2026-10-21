@@ -1,5 +1,6 @@
 import os
 from supabase import create_client, Client
+from pathlib import Path
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -15,9 +16,11 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 EXAMEN_ID = "EXANR5L17PO59048B3210P2D1"
 TEXTE_ID = "PRJLANR5L17B3210P2D1"
 BASE_URL = "https://eliasse.assemblee-nationale.fr/api-eliasse"
+BASE_DIR = Path(__file__).resolve().parent
 
 # Load deputies list for political group mapping
-df_deputes = pd.read_csv("../data/liste_deputes_libre_office.csv")
+csv_path = BASE_DIR / "data" / "liste_deputes_libre_office.csv"
+df_deputes = pd.read_csv(csv_path)
 # Convert identifier to string to match clean numeric strings extracted from actor uids
 df_deputes['identifiant'] = df_deputes['identifiant'].astype(str)
 
