@@ -35,6 +35,39 @@ def get_adopted_uids():
                 uids.append(amd.get('uid'))
     return uids
 
+import requests
+import pandas as pd
+from bs4 import BeautifulSoup
+import re
+
+# Configuration
+EXAMEN_ID = "EXANR5L17PO59048B3210P2D1"
+TEXTE_ID = "PRJLANR5L17B3210P2D1"
+BASE_URL = "https://eliasse.assemblee-nationale.fr/api-eliasse"
+
+# Load deputies list directly from the official open data URL
+DEPUTES_URL = "https://data.assemblee-nationale.fr/static/openData/repository/17/amo/deputes_actifs_csv_opendata/liste_deputes_libre_office.csv"
+df_deputes = pd.read_csv(DEPUTES_URL)
+df_deputes['identifiant'] = df_deputes['identifiant'].astype(str)
+
+def get_adopted_uids():
+    url = f"{BASE_URL}/examens/{EXAMEN_ID}/derouleur"
+    r = requests.get(url)
+    data = r.json()
+    uids = []
+    for place in data.get('places', []):
+        for amd in place.get('amendements', []):
+            if amd.get('sort') == "Adopté":
+                uids.append(amd.get('uid'))
+    return uids
+
+def clean_and_parse_int(text):
+    # Remove non-breaking spaces, HTML entities, and any standard whitespace
+    cleaned = text.replace('\xa0', '').replace('&nbsp;', '').replace(' ', '').strip()
+    # Extract only the sequence of digits
+    digits = re.sub(r'[^\d]', '', cleaned)
+    return int(digits) if digits else 0
+
 def parse_financials_with_group(uid):
     url = f"{BASE_URL}/textes/{TEXTE_ID}/examens/{EXAMEN_ID}/amendements/{uid}/with_neighbors"
     r = requests.get(url)
@@ -42,7 +75,7 @@ def parse_financials_with_group(uid):
     if not amd_data:
         return 0, "Inconnu"
 
-    # Extract author ID (e.g., 'PA793374') and strip letters to match the numeric 'identifiant'
+    # Extract author ID
     auteur_ref = amd_data.get('auteur', {}).get('ref', '')
     clean_id = re.sub(r'\D', '', auteur_ref)
 
@@ -59,14 +92,41 @@ def parse_financials_with_group(uid):
     soup = BeautifulSoup(amd_data['dispositif'], 'html.parser')
     rows = soup.select('tr.ligne_programme')
 
-    net_change = 0
+    total_plus = 0
+    total_minus = 0
+
     for row in rows:
         cells = row.find_all('td')
-        plus = int(re.sub(r'[^\d]', '', cells[1].text) or 0)
-        minus = int(re.sub(r'[^\d]', '', cells[2].text) or 0)
-        net_change += (plus - minus)
+        if len(cells) >= 3:
+            plus = clean_and_parse_int(cells[1].text)
+            minus = clean_and_parse_int(cells[2].text)
+            total_plus += plus
+            total_minus += minus
+
+    # Amendment-level logic:
+    # - If there is any addition (total_plus > 0) and subtraction, the subtraction is ignored.
+    # - If there is only subtraction (total_plus == 0), then it should be counted (as negative).
+    if total_plus > 0:
+        net_change = total_plus
+    else:
+        net_change = -total_minus
 
     return net_change, group
+
+# Execution
+adopted = get_adopted_uids()
+results = []
+
+for u in adopted:
+    impact, group = parse_financials_with_group(u)
+    results.append({"uid": u, "impact": impact, "group": group})
+
+# Create DataFrame and summarize results per group
+df_results = pd.DataFrame(results)
+summary = df_results.groupby("group")["impact"].sum().reset_index()
+summary.columns = ["Groupe politique", "Total Budgetary Impact (€)"]
+
+print(summary.to_string(index=False))
 
 # Execution
 adopted = get_adopted_uids()
