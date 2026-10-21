@@ -1,8 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Force Next.js to treat this page as dynamic (fetches fresh data on every request)
-export const dynamic = 'force-dynamic'
-
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
