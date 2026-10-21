@@ -1,6 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+// Force Next.js to treat this page as dynamic (fetches fresh data on every request)
+export const dynamic = 'force-dynamic'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 async function getSummary() {
   const { data, error } = await supabase.from('budget_summary').select('*')
@@ -22,11 +28,11 @@ export default async function Dashboard() {
           </tr>
         </thead>
         <tbody>
-          {summary.map((row) => (
+          {summary?.map((row) => (
             <tr key={row.groupe_politique}>
               <td className="border p-2">{row.groupe_politique}</td>
               <td className="border p-2 text-right font-mono">
-                {row.total_impact.toLocaleString()} €
+                {Number(row.total_impact).toLocaleString()} €
               </td>
             </tr>
           ))}
